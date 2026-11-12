@@ -1,0 +1,80 @@
+{
+  "info": {
+    "name": "Smart Lamp RGB (complemento)",
+    "description": "Complemento da collection FIWARE Made Simple: reprovisiona o lamp001 com o comando 'color' e o atributo 'color'. Ajuste a variável url para o IP da VM.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "url", "value": "localhost" },
+    { "key": "service", "value": "smart" },
+    { "key": "servicepath", "value": "/" },
+    { "key": "apikey", "value": "TEF" },
+    { "key": "device_id", "value": "lamp001" },
+    { "key": "entity_id", "value": "urn:ngsi-ld:Lamp:001" },
+    { "key": "entity_type", "value": "Lamp" }
+  ],
+  "item": [
+    {
+      "name": "R.1 Apagar device antigo (IoT Agent)",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          { "key": "fiware-service", "value": "{{service}}" },
+          { "key": "fiware-servicepath", "value": "{{servicepath}}" }
+        ],
+        "url": "http://{{url}}:4041/iot/devices/{{device_id}}"
+      }
+    },
+    {
+      "name": "R.2 Apagar entidade antiga (Orion) - 404 aqui é normal",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          { "key": "fiware-service", "value": "{{service}}" },
+          { "key": "fiware-servicepath", "value": "{{servicepath}}" }
+        ],
+        "url": "http://{{url}}:1026/v2/entities/{{entity_id}}"
+      }
+    },
+    {
+      "name": "R.3 Provisionar Smart Lamp RGB",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "fiware-service", "value": "{{service}}" },
+          { "key": "fiware-servicepath", "value": "{{servicepath}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"devices\": [\n    {\n      \"device_id\": \"{{device_id}}\",\n      \"apikey\": \"{{apikey}}\",\n      \"entity_name\": \"{{entity_id}}\",\n      \"entity_type\": \"{{entity_type}}\",\n      \"protocol\": \"PDI-IoTA-UltraLight\",\n      \"transport\": \"MQTT\",\n      \"commands\": [\n        { \"name\": \"on\", \"type\": \"command\" },\n        { \"name\": \"off\", \"type\": \"command\" },\n        { \"name\": \"color\", \"type\": \"command\" }\n      ],\n      \"attributes\": [\n        { \"object_id\": \"s\", \"name\": \"state\", \"type\": \"Text\" },\n        { \"object_id\": \"l\", \"name\": \"luminosity\", \"type\": \"Integer\" },\n        { \"object_id\": \"c\", \"name\": \"color\", \"type\": \"Text\" }\n      ]\n    }\n  ]\n}"
+        },
+        "url": "http://{{url}}:4041/iot/devices"
+      }
+    },
+    {
+      "name": "R.4 Trocar cor (ex.: azul)",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "fiware-service", "value": "{{service}}" },
+          { "key": "fiware-servicepath", "value": "{{servicepath}}" }
+        ],
+        "body": { "mode": "raw", "raw": "{\n  \"color\": {\n    \"type\": \"command\",\n    \"value\": \"0000FF\"\n  }\n}" },
+        "url": "http://{{url}}:1026/v2/entities/{{entity_id}}/attrs"
+      }
+    },
+    {
+      "name": "R.5 Ver estado e cor atuais",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "fiware-service", "value": "{{service}}" },
+          { "key": "fiware-servicepath", "value": "{{servicepath}}" }
+        ],
+        "url": "http://{{url}}:1026/v2/entities/{{entity_id}}?attrs=state,color,color_status,color_info&options=keyValues"
+      }
+    }
+  ]
+}

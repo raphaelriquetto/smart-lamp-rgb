@@ -1,0 +1,44 @@
+{
+  "expo": {
+    "name": "Smart Lamp",
+    "slug": "smart-lamp",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "ios": {
+      "bundleIdentifier": "br.edu.smartlamp",
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSAppTransportSecurity": { "NSAllowsArbitraryLoads": true }
+      }
+    },
+    "android": {
+      "package": "br.edu.smartlamp",
+      "adaptiveIcon": {
+        "backgroundColor": "#111216",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      [
+        "expo-build-properties",
+        { "android": { "usesCleartextTraffic": true } }
+      ],
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "Permitir que $(PRODUCT_NAME) use o microfone para comandos de voz.",
+          "speechRecognitionPermission": "Permitir que $(PRODUCT_NAME) reconheça sua voz para trocar a cor da lâmpada.",
+          "androidSpeechServicePackages": ["com.google.android.googlequicksearchbox"]
+        }
+      ]
+    ]
+  }
+}
