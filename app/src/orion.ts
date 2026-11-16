@@ -87,11 +87,11 @@ export const turnOff = (cfg: LampConfig) => sendCommand(cfg, 'off');
 /** Envia "lamp001@color|FF8800" para o ESP32. */
 export const setColor = (cfg: LampConfig, hex: string) => sendCommand(cfg, 'color', toDeviceHex(hex));
 
-export type LampState = { state?: string; color?: string; color_status?: string };
+export type LampState = { state?: string; color?: string; color_status?: string; luminosity?: number };
 
-/** Lê o estado atual que o ESP32 reportou (atributos s -> state, c -> color). */
+/** Lê o estado atual que o ESP32 reportou (s -> state, c -> color, l -> luminosity do LDR). */
 export async function getState(cfg: LampConfig): Promise<LampState> {
-  const res = await request(`${baseUrl(cfg)}?attrs=state,color,color_status&options=keyValues`, {
+  const res = await request(`${baseUrl(cfg)}?attrs=state,color,color_status,luminosity&options=keyValues`, {
     method: 'GET',
     headers: headers(cfg),
   });

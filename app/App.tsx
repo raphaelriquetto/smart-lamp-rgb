@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  AppState,
   Platform,
   Pressable,
   ScrollView,
@@ -37,12 +38,18 @@ import { Connection, StatTiles } from './src/components/StatTiles';
 import { PresetGrid, RecentRow } from './src/components/Swatches';
 import { VoiceButton } from './src/components/VoiceButton';
 import { SettingsSheet } from './src/components/SettingsSheet';
+import { LuminosityCard, Reading } from './src/components/Luminosity';
 
 const RECENTS_KEY = 'smart-lamp-recents';
 const MAX_RECENTS = 6;
 // Luz ambiente centrada mais ou menos na altura da lâmpada
 const AURA_HEIGHT = 680;
 const AURA_TOP = -130;
+// Luminosidade: o ESP32 publica a cada 5 s; guardamos os últimos 5 minutos
+const POLL_MS = 5000;
+const MAX_READINGS = 60;
+// Logo após um comando, o Orion ainda mostra a cor antiga até o ESP32 confirmar: não sobrescrever nesse intervalo
+const COMMAND_GRACE_MS = 3000;
 
 type Message = { kind: 'info' | 'ok' | 'error'; text: string };
 type ColorTab = 'wheel' | 'palette';
@@ -88,19 +95,53 @@ function Home() {
   // Destaque da interface acompanha a lâmpada; desligada, usa o verde de status da paleta.
   const accent = on ? lampColor.slice(0, 7) : color.accent;
 
-  const refresh = useCallback(async (cfg: LampConfig) => {
+  const [readings, setReadings] = useState<Reading[]>([]);
+  const lastCommandAt = useRef(0);
+
+  // quiet = consulta periódica: não troca a mensagem da tela a cada 5 s
+  const refresh = useCallback(async (cfg: LampConfig, quiet = false) => {
     if (!cfg.host) return setConnection('unknown');
     try {
       const s = await getState(cfg);
-      if (s.color && /^[0-9A-F]{6}$/i.test(s.color)) setLampColor(`#${s.color.toUpperCase()}`);
-      setOn(s.state === 'on');
-      setConnection('online');
+      if (Date.now() - lastCommandAt.current > COMMAND_GRACE_MS) {
+        if (s.color && /^[0-9A-F]{6}$/i.test(s.color)) setLampColor(`#${s.color.toUpperCase()}`);
+        setOn(s.state === 'on');
+      }
+      if (typeof s.luminosity === 'number' && Number.isFinite(s.luminosity)) {
+        const v = Math.round(Math.max(0, Math.min(100, s.luminosity)));
+        setReadings((prev) => [...prev, { t: Date.now(), v }].slice(-MAX_READINGS));
+      }
+      setConnection((c) => (c === 'sending' ? c : 'online'));
       setLastSync(new Date());
     } catch (e: any) {
       setConnection('offline');
-      setMessage({ kind: 'error', text: e.message ?? String(e) });
+      if (!quiet) setMessage({ kind: 'error', text: e.message ?? String(e) });
     }
   }, []);
+
+  // Consulta periódica (luminosidade + estado), só com o app na tela
+  useEffect(() => {
+    if (!config.host) return;
+    let timer: ReturnType<typeof setInterval> | null = null;
+    const start = () => {
+      if (!timer) timer = setInterval(() => refresh(config, true), POLL_MS);
+    };
+    const stop = () => {
+      if (timer) clearInterval(timer);
+      timer = null;
+    };
+    start();
+    const sub = AppState.addEventListener('change', (s) => {
+      if (s === 'active') {
+        refresh(config, true);
+        start();
+      } else stop();
+    });
+    return () => {
+      stop();
+      sub.remove();
+    };
+  }, [config, refresh]);
 
   useEffect(() => {
     loadConfig().then((cfg) => {
@@ -123,6 +164,7 @@ function Home() {
   }, []);
 
   const send = useCallback(async (label: string, action: () => Promise<void>) => {
+    lastCommandAt.current = Date.now();
     setConnection('sending');
     try {
       await action();
@@ -281,8 +323,10 @@ function Home() {
             />
           </Card>
 
+          <LuminosityCard readings={readings} connected={connection !== 'offline' && connection !== 'unknown'} index={2} />
+
           {showVoice && (
-            <Card icon="mic-outline" title="Comando de voz" index={2}>
+            <Card icon="mic-outline" title="Comando de voz" index={3}>
               <VoiceButton
                 available={voiceAvailable}
                 listening={voice.listening}

@@ -37,7 +37,15 @@ const int LDR_PIN = 34;
 // LED RGB de ânodo comum (perna comum no 3V3)? -> true. Cátodo comum (perna comum no GND)? -> false.
 const bool COMMON_ANODE = false;
 
-const unsigned long LUMINOSITY_INTERVAL_MS = 5000;
+// Sensor de luminosidade (módulo LDR, saída AO no GPIO 34)
+// Teste: tampe o sensor com o dedo. Se o valor SUBIR no escuro, mude para true.
+const bool LDR_INVERT = false;
+const int  LDR_SAMPLES = 16;                          // média de 16 leituras: tira o "ruído" do ADC
+const int  LUMINOSITY_JUMP = 5;                       // mudou 5 pontos ou mais? publica na hora
+const unsigned long LUMINOSITY_SAMPLE_MS = 250;       // lê o sensor 4x por segundo
+const unsigned long LUMINOSITY_MIN_GAP_MS = 1000;     // mas publica no máximo 1x por segundo
+
+const unsigned long LUMINOSITY_INTERVAL_MS = 5000;    // publicação periódica (mesmo sem mudança)
 const unsigned long STATE_INTERVAL_MS      = 60000;
 const unsigned long RECONNECT_INTERVAL_MS  = 2000;
 // ===========================================================================
@@ -50,6 +58,8 @@ String attrsTopic, luminosityTopic, cmdTopic, cmdExeTopic, clientId;
 bool ledOn = false;
 uint8_t curR = 255, curG = 255, curB = 255;  // última cor escolhida (branco no início)
 unsigned long lastLuminosityPublish = 0;
+unsigned long lastLuminositySample = 0;
+int lastLuminosity = -1;  // último valor publicado (-1 = nenhum ainda)
 unsigned long lastStatePublish = 0;
 unsigned long lastMqttAttempt = 0;
 
@@ -78,12 +88,38 @@ void publishState() {
   Serial.printf("-> %s %s\n", attrsTopic.c_str(), message.c_str());
 }
 
-void publishLuminosity() {
-  int reading = analogRead(LDR_PIN);
-  int luminosity = map(reading, 0, 4095, 0, 100);
+// Luminosidade de 0 (escuro) a 100 (muito claro), com média de várias leituras do ADC
+int readLuminosity() {
+  long sum = 0;
+  for (int i = 0; i < LDR_SAMPLES; i++) {
+    sum += analogRead(LDR_PIN);
+    delayMicroseconds(200);
+  }
+  int raw = sum / LDR_SAMPLES;                 // 0 a 4095
+  int luminosity = map(raw, 0, 4095, 0, 100);
+  if (LDR_INVERT) luminosity = 100 - luminosity;
+  return constrain(luminosity, 0, 100);
+}
+
+void publishLuminosity(int luminosity) {
   String message = String(luminosity);
   mqtt.publish(luminosityTopic.c_str(), message.c_str());
+  lastLuminosity = luminosity;
+  lastLuminosityPublish = millis();
   Serial.printf("-> %s %s\n", luminosityTopic.c_str(), message.c_str());
+}
+
+// Publica a cada LUMINOSITY_INTERVAL_MS ou na hora, se o ambiente mudar bruscamente
+void checkLuminosity() {
+  unsigned long now = millis();
+  if (now - lastLuminositySample < LUMINOSITY_SAMPLE_MS) return;
+  lastLuminositySample = now;
+
+  int luminosity = readLuminosity();
+  bool due = now - lastLuminosityPublish >= LUMINOSITY_INTERVAL_MS;
+  bool jumped = lastLuminosity >= 0 && abs(luminosity - lastLuminosity) >= LUMINOSITY_JUMP &&
+                now - lastLuminosityPublish >= LUMINOSITY_MIN_GAP_MS;
+  if (due || jumped) publishLuminosity(luminosity);
 }
 
 void confirmCommand(const String& command, const String& result) {
@@ -174,8 +210,7 @@ void connectMqtt() {
   Serial.println("conectado");
   mqtt.subscribe(cmdTopic.c_str());
   publishState();
-  publishLuminosity();
-  lastLuminosityPublish = millis();
+  publishLuminosity(readLuminosity());
 }
 
 void setup() {
@@ -214,12 +249,8 @@ void loop() {
   }
   mqtt.loop();
 
-  unsigned long now = millis();
-  if (now - lastLuminosityPublish >= LUMINOSITY_INTERVAL_MS) {
-    lastLuminosityPublish = now;
-    publishLuminosity();
-  }
-  if (now - lastStatePublish >= STATE_INTERVAL_MS) {
+  checkLuminosity();
+  if (millis() - lastStatePublish >= STATE_INTERVAL_MS) {
     publishState();
   }
 }

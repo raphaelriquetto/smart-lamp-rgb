@@ -47,7 +47,10 @@ O IoT Agent só repassa comandos que foram declarados no provisionamento. Import
 
 1. Ligue o LED RGB: R → GPIO 25, G → GPIO 26, B → GPIO 27, cada um com um resistor de 220 Ω a 330 Ω. A perna comum vai no GND (cátodo comum) ou no 3V3 (ânodo comum).
 2. Em `smart_lamp_rgb.ino`, preencha o Wi-Fi e o IP da VM. Se o LED for de ânodo comum, ponha `COMMON_ANODE = true`. Sinal de ânodo comum configurado errado: as cores saem invertidas (azul vira amarelo).
-3. Grave pela Arduino IDE (placa *DOIT ESP32 DEVKIT V1*, biblioteca *PubSubClient*). Ao ligar, o LED pisca vermelho, verde e azul.
+3. Ligue o **módulo LDR** (sensor de luminosidade): `VCC` → 3V3, `GND` → GND, `AO` → GPIO 34.
+4. Grave pela Arduino IDE (placa *DOIT ESP32 DEVKIT V1*, biblioteca *PubSubClient*). Ao ligar, o LED pisca vermelho, verde e azul.
+
+**Luminosidade (LDR):** o firmware lê o sensor 4 vezes por segundo, faz a média de 16 leituras para não oscilar e publica de 0 (escuro) a 100 (muito claro) no atributo `luminosity` a cada 5 s, ou na hora se mudar 5 pontos ou mais. Para conferir no Monitor Serial (115200), tampe o sensor com o dedo: o valor tem que **cair**. Se subir, mude `LDR_INVERT` para `true` (alguns módulos dão valores maiores no escuro).
 
 ## 4. App
 
@@ -98,6 +101,7 @@ Testado com Expo SDK 58, React Native 0.88, Reanimated 4.7 e reanimated-color-pi
 - **Lâmpada central**: halo na cor atual que "respira" quando ligada; tocar liga/desliga. O brilho de fundo da tela acompanha a cor.
 - **Indicadores**: estado, cor e conexão com o horário da última sincronização ("agora", "há 20s"…).
 - **Cor da luz**: abas **Roda** (roda de cores + brilho; a cor é enviada quando você solta o dedo) e **Paleta** (primárias, secundárias e branco), mais as **Recentes** (últimas 6, salvas no celular).
+- **Luminosidade** do ambiente medida pelo LDR: valor atual (escuro, penumbra, claro, muito claro), gráfico dos últimos 5 minutos (toque ou passe o mouse para ver cada ponto), mínima, média e máxima, e uma visão em tabela. O app consulta o Orion a cada 5 s enquanto está aberto.
 - **Comando de voz** com animação enquanto escuta (só no app; na versão web não aparece).
 - Vibração leve ao tocar.
 
@@ -153,7 +157,7 @@ Para ver o app funcionando sem AWS e sem hardware, dê dois cliques em **`script
 | Endereço | O que é |
 |---|---|
 | `http://localhost:8080` | O app, igual ao site da VM |
-| `http://localhost:1026` | A **lâmpada virtual**: um LED na tela que acende na cor enviada, com a lista de comandos recebidos |
+| `http://localhost:1026` | A **lâmpada virtual**: um LED na tela que acende na cor enviada, um controle para simular a luz do ambiente no **sensor LDR** e a lista de comandos recebidos |
 
 O simulador responde como o Orion de verdade nas requisições que o app e a collection usam: o comando fica `PENDING` por um instante e vira `OK` quando o "ESP32" confirma, e comandos ou entidades errados recebem os mesmos erros 422 e 404. Dá até para apontar a collection do Postman para `localhost`.
 

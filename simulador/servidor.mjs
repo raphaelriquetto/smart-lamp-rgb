@@ -37,6 +37,18 @@ const lamp = {
 };
 const history = []; // últimos comandos, para a página da lâmpada
 
+// Sensor LDR simulado: a luz do ambiente varia devagar; com a lâmpada ligada, o sensor recebe um pouco mais de luz.
+// Na página da lâmpada virtual dá para fixar o valor (como tampar o sensor ou acender a luz da sala).
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+let ambient = 42;
+let manual = null; // null = automático
+function updateLuminosity() {
+  if (manual === null) ambient = clamp(ambient + (Math.random() - 0.5) * 6, 8, 92);
+  const base = manual ?? ambient;
+  lamp.luminosity = Math.round(clamp(base + (lamp.state === 'on' ? 8 : 0), 0, 100));
+}
+setInterval(updateLuminosity, 5000); // mesmo ritmo do firmware
+
 const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, PATCH, POST, OPTIONS',
@@ -103,7 +115,18 @@ const orion = http.createServer(async (req, res) => {
   if (req.method === 'OPTIONS') return send(res, 204, '');
 
   if (req.method === 'GET' && url.pathname === '/') return send(res, 200, LAMP_PAGE, 'text/html; charset=utf-8');
-  if (req.method === 'GET' && url.pathname === '/estado') return send(res, 200, { ...lamp, history });
+  if (req.method === 'GET' && url.pathname === '/estado') return send(res, 200, { ...lamp, history, ldrManual: manual !== null });
+  // /ldr?v=30 fixa o sensor em 30%; /ldr?v=auto volta ao automático
+  if (req.method === 'GET' && url.pathname === '/ldr') {
+    const v = url.searchParams.get('v');
+    const previous = manual;
+    manual = v === 'auto' || v === null ? null : clamp(Number(v) || 0, 0, 100);
+    // Voltando ao automático, continua da luz do ambiente que estava fixada (sem o brilho extra da lâmpada)
+    if (manual === null && previous !== null) ambient = previous;
+    updateLuminosity(); // como o firmware: mudança brusca é publicada na hora
+    log(manual === null ? 'LDR: automático' : `LDR: luz do ambiente em ${manual}%`);
+    return send(res, 200, { luminosity: lamp.luminosity, manual: manual !== null });
+  }
   if (req.method === 'GET' && url.pathname === '/version') {
     return send(res, 200, { orion: { version: 'simulador', uptime: `${Math.round(process.uptime())}s` } });
   }
@@ -211,12 +234,25 @@ const LAMP_PAGE = `<!doctype html>
   li time { color:var(--muted) } li.err { color:#F87171 }
   .empty { color:var(--muted); font-family:inherit }
   .status { margin-top:10px; font-size:12px; color:var(--muted) }
+  .ldr { margin-bottom:14px }
+  .ldr .row { display:flex; align-items:baseline; justify-content:space-between }
+  .ldr .val { font-size:28px; font-weight:700 }
+  .ldr input { width:100%; margin:10px 0 6px; accent-color:#C4861C }
+  .ldr button { background:transparent; color:var(--fg); border:1px solid var(--line); border-radius:999px; padding:6px 12px; font:inherit; font-size:13px; cursor:pointer }
+  .ldr button[aria-pressed="true"] { background:rgba(248,250,252,.1) }
+  .hint { font-size:12px; color:var(--muted) }
 </style></head>
 <body class="off">
   <div class="eyebrow">Simulador · ESP32 + LED RGB</div>
   <h1>Lâmpada virtual</h1>
   <div class="stage"><div class="halo"></div><div class="led"></div></div>
   <div class="info"><b id="state">Desligada</b><span id="hex">#FFFFFF</span></div>
+  <div class="panel ldr">
+    <h2>Sensor de luz (LDR)</h2>
+    <div class="row"><span class="val" id="ldr">--%</span><button id="auto" aria-pressed="true">Automático</button></div>
+    <input id="slider" type="range" min="0" max="100" value="42" aria-label="Luz do ambiente">
+    <div class="hint">Arraste para simular a luz do ambiente (0 = sensor tampado). O app mostra o valor em até 5 s.</div>
+  </div>
   <div class="panel"><h2>Comandos recebidos</h2><ul id="log"><li class="empty">Nenhum comando ainda. Use o app em http://localhost:8080</li></ul>
   <div class="status" id="status"></div></div>
 <script>
@@ -228,10 +264,18 @@ const LAMP_PAGE = `<!doctype html>
       document.getElementById('state').textContent = s.state === 'on' ? 'Ligada' : 'Desligada';
       document.getElementById('hex').textContent = '#' + s.color;
       document.getElementById('status').textContent = 'color_status: ' + s.color_status + ' · on_status: ' + s.on_status + ' · off_status: ' + s.off_status;
+      document.getElementById('ldr').textContent = s.luminosity + '%';
+      document.getElementById('auto').setAttribute('aria-pressed', String(!s.ldrManual));
+      if (!dragging) document.getElementById('slider').value = s.luminosity;
       const ul = document.getElementById('log');
       if (s.history.length) ul.innerHTML = s.history.map(h => '<li class="' + (h.ok ? '' : 'err') + '"><time>' + h.at + '</time>' + h.text.replace(/</g,'&lt;') + '</li>').join('');
     } catch (e) { document.getElementById('status').textContent = 'Simulador parado.'; }
   }
+  let dragging = false;
+  const slider = document.getElementById('slider');
+  slider.addEventListener('input', () => { dragging = true; });
+  slider.addEventListener('change', async () => { await fetch('/ldr?v=' + slider.value); dragging = false; tick(); });
+  document.getElementById('auto').addEventListener('click', async () => { await fetch('/ldr?v=auto'); tick(); });
   tick(); setInterval(tick, 400);
 </script>
 </body></html>`;
