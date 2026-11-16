@@ -5,9 +5,10 @@
 #   3. Instala as dependências (só na 1ª vez) e abre o Expo em modo túnel (funciona no Wi-Fi da faculdade)
 #
 # Uso: dê dois cliques em iniciar.cmd, ou rode  .\scripts\iniciar.cmd  no terminal.
-# Parâmetro opcional: -Modo web   (abre no navegador em vez do QR code)
+# Parâmetro opcional: -Modo web       (abre no navegador em vez do QR code)
+#                     -Modo simular   (simula a VM e o ESP32 neste PC; ver scripts\simular.cmd)
 
-param([ValidateSet('tunnel', 'lan', 'web')][string]$Modo = 'tunnel')
+param([ValidateSet('tunnel', 'lan', 'web', 'simular')][string]$Modo = 'tunnel')
 
 $ErrorActionPreference = 'Stop'
 $AppDir = Join-Path (Split-Path -Parent $PSScriptRoot) 'app'
@@ -64,6 +65,14 @@ if (-not $v) {
     $v = & node -v
 }
 Write-Host "Usando Node $v" -ForegroundColor Green
+
+# O simulador não tem dependências: não precisa de npm install
+if ($Modo -eq 'simular') {
+    $servidor = Join-Path (Split-Path -Parent $PSScriptRoot) 'simulador\servidor.mjs'
+    Start-Job -ScriptBlock { Start-Sleep -Seconds 2; Start-Process 'http://localhost:1026'; Start-Process 'http://localhost:8080' } | Out-Null
+    & node $servidor
+    return
+}
 
 Set-Location $AppDir
 if (-not (Test-Path 'node_modules')) {

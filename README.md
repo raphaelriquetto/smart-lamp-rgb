@@ -16,7 +16,8 @@ O app não fala com o ESP32 direto. Ele faz o mesmo `PATCH` da pasta 4 da collec
 | `firmware/smart_lamp_rgb/` | Sketch do ESP32 com LED RGB e o comando `color` |
 | `postman/` | Requisições para reprovisionar o `lamp001` com `color` e testar |
 | `app/` | Projeto do app Expo (React Native): tela em `App.tsx`, componentes em `src/components/` |
-| `scripts/` | `iniciar.cmd` abre o app em qualquer PC Windows; `gerar-web.cmd` recria a versão web |
+| `scripts/` | `iniciar.cmd` abre o app em qualquer PC Windows; `simular.cmd` testa sem VM nem ESP32; `gerar-web.cmd` recria a versão web |
+| `simulador/` | Imita a VM (Orion + site) e o ESP32 no próprio PC, com uma lâmpada virtual (seção 6) |
 | `web/` | Versão web pronta (`site/`) + nginx em Docker para rodar na VM (seção 5) |
 
 ## 1. Contrato novo
@@ -145,7 +146,22 @@ scp -i chave.pem -r web ubuntu@IP-DA-VM:~/smart-lamp-web
 
 **Parar o site:** `docker compose down` dentro de `web`.
 
-## 6. Problemas comuns
+## 6. Testar sem a VM e sem o ESP32 (simulador)
+
+Para ver o app funcionando sem AWS e sem hardware, dê dois cliques em **`scripts/simular.cmd`**. Ele só precisa do Node (baixa o portátil se faltar) e abre duas páginas no navegador:
+
+| Endereço | O que é |
+|---|---|
+| `http://localhost:8080` | O app, igual ao site da VM |
+| `http://localhost:1026` | A **lâmpada virtual**: um LED na tela que acende na cor enviada, com a lista de comandos recebidos |
+
+O simulador responde como o Orion de verdade nas requisições que o app e a collection usam: o comando fica `PENDING` por um instante e vira `OK` quando o "ESP32" confirma, e comandos ou entidades errados recebem os mesmos erros 422 e 404. Dá até para apontar a collection do Postman para `localhost`.
+
+**No celular:** com o celular no mesmo Wi-Fi do PC, abra o endereço `http://IP-DO-PC:8080` que o simulador mostra no terminal. Na primeira vez o Windows pergunta se o Node pode receber conexões na rede: permita em **redes privadas**.
+
+O que o simulador **não** testa: o ESP32 de verdade, o MQTT e as portas da AWS. Para isso, use a VM (seção 5).
+
+## 7. Problemas comuns
 
 | Sintoma | Causa provável |
 |---|---|
