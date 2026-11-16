@@ -1,5 +1,14 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -15,7 +24,8 @@ import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { FadeIn, useReducedMotion } from 'react-native-reanimated';
 import ColorPicker, { BrightnessSlider, ColorFormatsObject, Panel3 } from 'reanimated-color-picker';
 
-import { color, colorName, haptic, icon, motion, radius, space, touch, type, withAlpha } from './src/theme';
+import { color, colorName, haptic, icon, motion, radius, space, touch, type } from './src/theme';
+import { Light, falloff } from './src/components/Light';
 import { DEFAULT_CONFIG, LampConfig, getState, loadConfig, saveConfig, setColor, turnOff, turnOn } from './src/orion';
 import { parseVoice } from './src/voice/parseVoice';
 import { useVoiceCommand, voiceAvailable } from './src/voice/useVoiceCommand';
@@ -30,6 +40,9 @@ import { SettingsSheet } from './src/components/SettingsSheet';
 
 const RECENTS_KEY = 'smart-lamp-recents';
 const MAX_RECENTS = 6;
+// Luz ambiente centrada mais ou menos na altura da lâmpada
+const AURA_HEIGHT = 680;
+const AURA_TOP = -130;
 
 type Message = { kind: 'info' | 'ok' | 'error'; text: string };
 type ColorTab = 'wheel' | 'palette';
@@ -70,6 +83,7 @@ function Home() {
   const [recents, setRecents] = useState<string[]>([]);
   const [tab, setTab] = useState<ColorTab>('wheel');
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const { width: screenWidth } = useWindowDimensions();
 
   // Destaque da interface acompanha a lâmpada; desligada, usa o verde de status da paleta.
   const accent = on ? lampColor.slice(0, 7) : color.accent;
@@ -166,30 +180,21 @@ function Home() {
   const messageTone = message.kind === 'ok' ? color.success : message.kind === 'error' ? color.danger : color.mutedForeground;
   const glowTint = on ? lampColor : color.off;
   const showVoice = Platform.OS !== 'web';
+  const auraWidth = Math.max(screenWidth * 1.7, 640);
 
   return (
     <View style={styles.screen}>
       <StatusBar style="light" />
 
-      {/* Fonte de luz atrás do vidro: halo da lâmpada no topo. Fica numa camada própria e
-          recortada: os círculos são mais largos que a tela e não podem empurrar o conteúdo. */}
+      {/* Luz ambiente: a lâmpada ilumina o fundo atrás do vidro, em degradê suave.
+          Fica numa camada própria e recortada: a elipse é mais larga que a tela e não pode empurrar o conteúdo. */}
       <View pointerEvents="none" style={styles.auraLayer}>
-        {[900, 780, 660, 540, 420].map((size) => (
-          <View
-            key={size}
-            style={[
-              styles.aura,
-              {
-                width: size,
-                height: size,
-                borderRadius: size / 2,
-                top: -size / 2 + 60,
-                marginLeft: -size / 2,
-                backgroundColor: withAlpha(glowTint, on ? 0.032 : 0.018),
-              },
-            ]}
-          />
-        ))}
+        <Light
+          width={auraWidth}
+          height={AURA_HEIGHT}
+          stops={falloff(glowTint.slice(0, 7), on ? 0.3 : 0.1)}
+          style={{ position: 'absolute', top: AURA_TOP, left: (screenWidth - auraWidth) / 2 }}
+        />
       </View>
 
       <SafeAreaView style={{ flex: 1 }} edges={['top', 'left', 'right']}>
@@ -316,7 +321,6 @@ const styles = StyleSheet.create({
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: color.background },
   screen: { flex: 1, backgroundColor: color.background, overflow: 'hidden' },
   auraLayer: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, overflow: 'hidden' },
-  aura: { position: 'absolute', left: '50%' },
   content: {
     paddingHorizontal: space.lg + space.xs,
     paddingTop: space.md,

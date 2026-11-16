@@ -82,6 +82,15 @@ export function withAlpha(hex: string, alpha: number) {
   return `#${clean(hex)}${a}`;
 }
 
+/** Mistura duas cores: mix('#FF0000', '#FFFFFF', 0.5) = vermelho clareado pela metade. */
+export function mix(a: string, b: string, t: number) {
+  const pa = clean(a);
+  const pb = clean(b);
+  const ch = (h: string, i: number) => parseInt(h.slice(i, i + 2), 16);
+  const out = [0, 2, 4].map((i) => Math.round(ch(pa, i) + (ch(pb, i) - ch(pa, i)) * t));
+  return `#${out.map((v) => v.toString(16).padStart(2, '0')).join('').toUpperCase()}`;
+}
+
 /** Luminância relativa (WCAG 2.x). */
 function luminance(hex: string) {
   const h = clean(hex);
