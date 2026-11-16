@@ -1,7 +1,7 @@
 // Lâmpada central: anéis de brilho na cor atual e botão de liga/desliga no meio.
 import { useEffect } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { colorName, isLight, theme, withAlpha } from '../theme';
 

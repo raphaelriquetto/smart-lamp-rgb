@@ -16,7 +16,8 @@ O app não fala com o ESP32 direto. Ele faz o mesmo `PATCH` da pasta 4 da collec
 | `firmware/smart_lamp_rgb/` | Sketch do ESP32 com LED RGB e o comando `color` |
 | `postman/` | Requisições para reprovisionar o `lamp001` com `color` e testar |
 | `app/` | Projeto do app Expo (React Native): tela em `App.tsx`, componentes em `src/components/` |
-| `scripts/` | `iniciar.cmd`: abre o app em qualquer PC Windows, baixando o Node certo se precisar |
+| `scripts/` | `iniciar.cmd` abre o app em qualquer PC Windows; `gerar-web.cmd` recria a versão web |
+| `web/` | Versão web pronta (`site/`) + nginx em Docker para rodar na VM (seção 5) |
 
 ## 1. Contrato novo
 
@@ -109,13 +110,48 @@ O reconhecimento de voz usa código nativo, que **não existe no Expo Go**. No E
 
 Segure o botão, fale e solte. Frases que funcionam: "azul", "deixa vermelho", "luz verde", "azul claro", "rosa", "laranja", "roxo", "branco", "liga", "desliga", "apaga". O vocabulário fica em `src/colors.ts`. No Android, o reconhecimento precisa do app Google instalado.
 
-## 5. Problemas comuns
+## 5. Versão web na VM (plano B, sem PC e sem instalar nada)
+
+O app também roda como site, servido pela própria VM da AWS. Qualquer celular (Android ou iPhone) abre `http://IP-DA-VM:8080` no navegador e controla a lâmpada. O IP do Orion já vem preenchido, porque é o mesmo da página.
+
+Nessa versão **não há comando de voz**: o navegador só libera o microfone em HTTPS, e a VM serve HTTP. Roda de cores, cores rápidas, recentes e liga/desliga funcionam normalmente.
+
+O site já vem pronto em `web/site`. Na VM não precisa de Node, só do Docker que o FIWARE já usa.
+
+**Uma vez só:**
+
+1. No **Security Group** da VM, libere a porta **8080 (TCP)**, do mesmo jeito que a 1026.
+2. Entre na VM por SSH e baixe o repositório. Como ele é privado, o Git pede usuário e um **token** do GitHub no lugar da senha (crie em *GitHub → Settings → Developer settings → Personal access tokens → Fine-grained*, com acesso de leitura a este repositório):
+   ```bash
+   git clone https://github.com/raphaelriquetto/smart-lamp-rgb.git
+   ```
+3. Suba o site:
+   ```bash
+   cd smart-lamp-rgb/web
+   ```
+   ```bash
+   docker compose up -d
+   ```
+4. No celular, abra `http://IP-DA-VM:8080`. Dica: no menu do navegador, use **Adicionar à tela inicial** para abrir como um app, em tela cheia.
+
+**Sem querer usar token:** copie só a pasta `web` do seu PC para a VM com a mesma chave `.pem` que vocês usam no SSH (`ubuntu` no Ubuntu, `ec2-user` no Amazon Linux) e rode o passo 3 dentro dela:
+```bash
+scp -i chave.pem -r web ubuntu@IP-DA-VM:~/smart-lamp-web
+```
+
+**Quando mudar o app:** no PC, rode `scripts\gerar-web.cmd` (recria `web/site`), faça commit e push, e na VM rode `git pull` dentro de `smart-lamp-rgb`. Não precisa reiniciar o container: o nginx já serve os arquivos novos.
+
+**Parar o site:** `docker compose down` dentro de `web`.
+
+## 6. Problemas comuns
 
 | Sintoma | Causa provável |
 |---|---|
 | `npm install` falha com `EBADENGINE` ou o Metro não inicia | Node antigo (ex.: 20.x). Use o `scripts/iniciar.cmd` |
 | "Couldn't create a signed tunnel URL… not logged in" | Use `npm run tunnel` (ngrok) em vez de `npx expo start --tunnel` |
 | Expo Go diz que o projeto usa um SDK incompatível | Atualize o Expo Go na loja |
+| Site da VM não abre (`http://IP:8080`) | Porta 8080 fechada no Security Group, ou container parado (`docker compose ps` dentro de `web`) |
+| Site abre mas mostra "Sem conexão" | Porta 1026 fechada para a rede do celular: o navegador do celular chama o Orion direto |
 | "Tempo esgotado" no app | Porta 1026 fechada no Security Group da AWS, IP errado, ou VM desligada (o IP público muda quando a VM reinicia, a não ser que você use um Elastic IP) |
 | `color_status` fica `PENDING` | O ESP32 não está conectado ao broker ou ainda está com o firmware antigo |
 | Orion responde 422/400 em `color` | O device não foi reprovisionado com o comando `color` (passo 2) |

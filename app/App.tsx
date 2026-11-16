@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
@@ -225,18 +225,20 @@ function Home() {
             />
           </Card>
 
-          <Card icon="mic-outline" title="Comando de voz" style={{ marginBottom: 32 }}>
-            <VoiceButton
-              available={voiceAvailable}
-              listening={voice.listening}
-              accent={accent}
-              onStart={() => {
-                haptic.press();
-                voice.start();
-              }}
-              onStop={voice.stop}
-            />
-          </Card>
+          {Platform.OS !== 'web' && (
+            <Card icon="mic-outline" title="Comando de voz">
+              <VoiceButton
+                available={voiceAvailable}
+                listening={voice.listening}
+                accent={accent}
+                onStart={() => {
+                  haptic.press();
+                  voice.start();
+                }}
+                onStop={voice.stop}
+              />
+            </Card>
+          )}
         </ScrollView>
       </SafeAreaView>
 
@@ -260,7 +262,7 @@ function Home() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: theme.bg, overflow: 'hidden' },
   aura: { position: 'absolute', alignSelf: 'center' },
-  content: { paddingHorizontal: 20, paddingTop: 12 },
+  content: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 32, width: '100%', maxWidth: 520, alignSelf: 'center' },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   headerRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   eyebrow: { color: theme.muted, fontSize: 12, fontWeight: '600', letterSpacing: 1, textTransform: 'uppercase' },

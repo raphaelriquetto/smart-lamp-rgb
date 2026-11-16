@@ -2,8 +2,13 @@
 // O app NUNCA fala com o ESP32 direto: ele só faz PATCH no Orion (porta 1026),
 // que repassa o comando ao IoT Agent -> Mosquitto -> ESP32.
 
+import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { toDeviceHex } from './colors';
+
+// Na versão web hospedada na VM, o Orion está na mesma máquina que serviu a página:
+// o IP já vem preenchido e ninguém precisa digitar nada.
+const pageHost = Platform.OS === 'web' && typeof window !== 'undefined' ? window.location.hostname : '';
 
 export type LampConfig = {
   host: string; // IP público da VM na AWS, ex.: 54.123.45.67
@@ -14,7 +19,7 @@ export type LampConfig = {
 };
 
 export const DEFAULT_CONFIG: LampConfig = {
-  host: '',
+  host: pageHost,
   port: '1026',
   service: 'smart',
   servicePath: '/',

@@ -1,13 +1,17 @@
 // "Aperte e fale": enquanto o botão está pressionado, o celular escuta em pt-BR.
 // Usa expo-speech-recognition, que NÃO existe no Expo Go (precisa de development build).
 // Por isso o import é protegido: no Expo Go o botão de voz aparece desabilitado e o resto funciona.
+// Na web a voz fica desligada: o navegador só libera o microfone em HTTPS, e a VM serve HTTP.
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { Platform } from 'react-native';
 
 let Speech: any = null;
-try {
-  Speech = require('expo-speech-recognition').ExpoSpeechRecognitionModule;
-} catch {
-  Speech = null;
+if (Platform.OS !== 'web') {
+  try {
+    Speech = require('expo-speech-recognition').ExpoSpeechRecognitionModule;
+  } catch {
+    Speech = null;
+  }
 }
 
 export const voiceAvailable = Speech != null;

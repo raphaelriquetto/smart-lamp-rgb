@@ -6,3 +6,6 @@ android/
 ios/
 *.log
 .DS_Store
+
+# O build web guarda fontes e imagens numa pasta chamada node_modules: precisa ir para o repositório
+!web/site/assets/node_modules/
