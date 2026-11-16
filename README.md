@@ -15,7 +15,8 @@ O app não fala com o ESP32 direto. Ele faz o mesmo `PATCH` da pasta 4 da collec
 |---|---|
 | `firmware/smart_lamp_rgb/` | Sketch do ESP32 com LED RGB e o comando `color` |
 | `postman/` | Requisições para reprovisionar o `lamp001` com `color` e testar |
-| `app/` | Arquivos do app Expo (React Native): `App.tsx`, `app.json` e `src/` |
+| `app/` | Projeto do app Expo (React Native): tela em `App.tsx`, componentes em `src/components/` |
+| `scripts/` | `iniciar.cmd`: abre o app em qualquer PC Windows, baixando o Node certo se precisar |
 
 ## 1. Contrato novo
 
@@ -48,7 +49,21 @@ O IoT Agent só repassa comandos que foram declarados no provisionamento. Import
 
 ## 4. App
 
-Precisa do [Node.js LTS](https://nodejs.org) no computador e do app **Expo Go** (Play Store / App Store) no celular. A pasta `app/` já é um projeto Expo completo:
+No celular, instale o **Expo Go** (Play Store / App Store, versão mais recente).
+
+> **Versão do Node:** o Expo SDK 58 exige **Node 22.13+, 24.3+ ou 26+**. Com Node 20 o `npm install` ou o Metro falham.
+
+### Jeito fácil (qualquer PC Windows, inclusive o da faculdade)
+
+Dê dois cliques em **`scripts/iniciar.cmd`**. Ele:
+
+1. usa o Node do PC se for compatível; senão baixa o Node LTS **portátil** do nodejs.org para `%LOCALAPPDATA%\smart-lamp-node` (sem administrador, confere o SHA-256 e não altera o sistema);
+2. roda `npm install` na primeira vez;
+3. abre o Expo em **modo túnel** (ngrok), que funciona mesmo no Wi-Fi da faculdade e no 4G, sem conta Expo.
+
+Leia o QR code (Android: pelo Expo Go; iPhone: pela câmera). Para abrir no navegador em vez do celular: `scripts\iniciar.cmd -Modo web`.
+
+### Jeito manual (Node compatível já instalado)
 
 ```bash
 cd app
@@ -59,23 +74,30 @@ npm install
 ```
 
 ```bash
-npx expo start
+npm run tunnel
 ```
 
-### Onde testar
-
-| Onde | Como |
+| Comando | Quando usar |
 |---|---|
-| Celular na mesma rede Wi-Fi do PC | `npx expo start` e ler o QR code (Android: pelo Expo Go; iPhone: pela câmera) |
-| Celular em rede diferente, ou Wi-Fi da faculdade que bloqueia conexões entre aparelhos | `npx expo start --tunnel` (na primeira vez ele instala o `@expo/ngrok`) |
-| Navegador de qualquer PC | `npx expo start --web` (o Orion do professor já libera CORS) |
-| Outro computador | Copie a pasta **sem** `node_modules` (GitHub, pendrive ou zip), instale o Node.js LTS e rode os três comandos acima |
+| `npm run tunnel` | Recomendado: funciona em qualquer rede (usa ngrok, não precisa de conta) |
+| `npm start` | Celular e PC na mesma rede Wi-Fi, sem bloqueio entre aparelhos |
+| `npm run web` | Testar no navegador do PC (o Orion do professor já libera CORS) |
+
+Para levar a outro computador: clone o repositório do GitHub (ou copie a pasta **sem** `node_modules`) e use o `iniciar.cmd`.
 
 Em todos os casos quem precisa alcançar a VM é o **celular** (ou o navegador), não o PC: a porta 1026 tem que estar liberada no Security Group da AWS para a rede de onde vocês estão testando.
 
-Testado com Expo SDK 58, React Native 0.88, Reanimated 4.7 e reanimated-color-picker 5.1 (TypeScript sem erros; tela, roda de cores, botões e requisições conferidos no navegador contra um Orion simulado).
+Na primeira vez o app abre a tela de configurações: informe o **IP público da VM**, toque em **Testar conexão** e salve.
 
-Leia o QR code com o Expo Go. Na primeira vez o app abre a tela de configurações: informe o **IP público da VM** e salve.
+Testado com Expo SDK 58, React Native 0.88, Reanimated 4.7 e reanimated-color-picker 5.1 (TypeScript sem erros; tela, roda de cores, botões e requisições conferidos no navegador contra um Orion simulado; `iniciar.cmd` testado sem Node no PATH e túnel ngrok respondendo pela internet).
+
+### O que tem na tela
+
+- **Lâmpada central**: mostra a cor atual com brilho; tocar liga/desliga.
+- **Roda de cores** com controle de brilho; a cor é enviada quando você solta o dedo.
+- **Cores rápidas** (primárias, secundárias e branco) e **Recentes** (últimas 6 cores, salvas no celular).
+- **Comando de voz** com animação enquanto escuta.
+- **Status** no topo (Conectada / Sem conexão / Enviando) e vibração leve ao tocar.
 
 ### Comando de voz
 
@@ -91,6 +113,9 @@ Segure o botão, fale e solte. Frases que funcionam: "azul", "deixa vermelho", "
 
 | Sintoma | Causa provável |
 |---|---|
+| `npm install` falha com `EBADENGINE` ou o Metro não inicia | Node antigo (ex.: 20.x). Use o `scripts/iniciar.cmd` |
+| "Couldn't create a signed tunnel URL… not logged in" | Use `npm run tunnel` (ngrok) em vez de `npx expo start --tunnel` |
+| Expo Go diz que o projeto usa um SDK incompatível | Atualize o Expo Go na loja |
 | "Tempo esgotado" no app | Porta 1026 fechada no Security Group da AWS, IP errado, ou VM desligada (o IP público muda quando a VM reinicia, a não ser que você use um Elastic IP) |
 | `color_status` fica `PENDING` | O ESP32 não está conectado ao broker ou ainda está com o firmware antigo |
 | Orion responde 422/400 em `color` | O device não foi reprovisionado com o comando `color` (passo 2) |
