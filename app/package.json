@@ -3,10 +3,13 @@
   "version": "1.0.0",
   "main": "index.ts",
   "dependencies": {
+    "@expo-google-fonts/plus-jakarta-sans": "^0.4.2",
     "@expo/vector-icons": "^15.0.2",
     "@react-native-async-storage/async-storage": "2.2.0",
     "expo": "~58.0.25",
+    "expo-blur": "~58.0.6",
     "expo-build-properties": "~58.0.12",
+    "expo-font": "~58.0.12",
     "expo-haptics": "~58.0.8",
     "expo-speech-recognition": "^58.0.1",
     "expo-status-bar": "~58.0.5",
@@ -27,7 +30,7 @@
   },
   "scripts": {
     "start": "expo start",
-    "tunnel": "expo start --tunnel ngrok",
+    "tunnel": "expo start --tunnel",
     "web": "expo start --web",
     "android": "expo start --android",
     "ios": "expo start --ios"

@@ -5,11 +5,12 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import Animated, {
   cancelAnimation,
   useAnimatedStyle,
+  useReducedMotion,
   useSharedValue,
   withRepeat,
   withTiming,
 } from 'react-native-reanimated';
-import { theme } from '../theme';
+import { color, icon, motion, onColor, space, type } from '../theme';
 
 type Props = {
   available: boolean;
@@ -19,48 +20,62 @@ type Props = {
   onStop: () => void;
 };
 
+const MIC = 72;
+
 export function VoiceButton({ available, listening, accent, onStart, onStop }: Props) {
+  const reduceMotion = useReducedMotion();
   const pulse = useSharedValue(0);
+
   useEffect(() => {
-    if (listening) {
+    if (listening && !reduceMotion) {
       pulse.value = 0;
       pulse.value = withRepeat(withTiming(1, { duration: 1100 }), -1, false);
     } else {
       cancelAnimation(pulse);
-      pulse.value = withTiming(0, { duration: 200 });
+      pulse.value = withTiming(0, { duration: motion.press });
     }
-  }, [listening]);
+  }, [listening, reduceMotion]);
 
   const wave = useAnimatedStyle(() => ({
-    opacity: listening ? 0.6 * (1 - pulse.value) : 0,
+    opacity: 0.55 * (1 - pulse.value),
     transform: [{ scale: 1 + pulse.value * 0.7 }],
   }));
 
-  const color = listening ? theme.danger : accent;
+  const tone = listening ? color.danger : accent;
 
   return (
     <View style={styles.row}>
       <View style={styles.micWrap}>
-        <Animated.View style={[styles.wave, { backgroundColor: color }, wave]} pointerEvents="none" />
+        <Animated.View style={[styles.wave, { backgroundColor: tone }, wave]} pointerEvents="none" />
         <Pressable
           onPressIn={onStart}
           onPressOut={onStop}
           disabled={!available}
+          accessibilityRole="button"
           accessibilityLabel="Segure para falar uma cor"
+          accessibilityState={{ disabled: !available, busy: listening }}
           style={({ pressed }) => [
             styles.mic,
-            { backgroundColor: available ? color : theme.off, shadowColor: color },
-            pressed && { transform: [{ scale: 0.93 }] },
+            {
+              backgroundColor: available ? tone : color.off,
+              shadowColor: tone,
+              opacity: pressed ? 0.85 : 1,
+              transform: [{ scale: pressed ? 0.95 : 1 }],
+            },
           ]}
         >
-          <Ionicons name={listening ? 'mic' : 'mic-outline'} size={30} color="#fff" />
+          <Ionicons
+            name={listening ? 'mic' : 'mic-outline'}
+            size={icon.lg}
+            color={available ? onColor(tone) : color.foreground}
+          />
         </Pressable>
       </View>
-      <View style={{ flex: 1 }}>
-        <Text style={styles.title}>
+      <View style={styles.text}>
+        <Text style={type.heading}>
           {!available ? 'Voz indisponível no Expo Go' : listening ? 'Ouvindo… solte para enviar' : 'Segure e fale'}
         </Text>
-        <Text style={styles.hint}>
+        <Text style={type.label}>
           {available ? '“azul”, “deixa vermelho”, “desliga”' : 'Precisa da development build (veja o README)'}
         </Text>
       </View>
@@ -69,20 +84,21 @@ export function VoiceButton({ available, listening, accent, onStart, onStop }: P
 }
 
 const styles = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'center', gap: 18 },
-  micWrap: { width: 72, height: 72, alignItems: 'center', justifyContent: 'center' },
-  wave: { position: 'absolute', width: 72, height: 72, borderRadius: 36 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: space.lg + 2 },
+  micWrap: { width: MIC, height: MIC, alignItems: 'center', justifyContent: 'center' },
+  wave: { position: 'absolute', width: MIC, height: MIC, borderRadius: MIC / 2 },
   mic: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
+    width: MIC,
+    height: MIC,
+    borderRadius: MIC / 2,
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
     shadowOpacity: 0.6,
     shadowRadius: 16,
     shadowOffset: { width: 0, height: 4 },
     elevation: 8,
   },
-  title: { color: theme.text, fontSize: 15, fontWeight: '600' },
-  hint: { color: theme.muted, fontSize: 12.5, marginTop: 3 },
+  text: { flex: 1, gap: 2 },
 });

@@ -1,8 +1,8 @@
-// Cores fixas (grade) e últimas cores usadas (linha).
+// Cores fixas (grade) e últimas cores usadas (linha). Alvos de toque de pelo menos 48 pt.
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { PRESETS } from '../colors';
-import { isLight, theme, withAlpha } from '../theme';
+import { color, icon, isLight, radius, space, type, withAlpha } from '../theme';
 
 const same = (a: string, b: string) => a.slice(0, 7).toUpperCase() === b.slice(0, 7).toUpperCase();
 
@@ -17,19 +17,26 @@ export function PresetGrid({ current, on, onPick }: Props) {
           <Pressable
             key={p.hex}
             onPress={() => onPick(p.hex, p.name)}
+            accessibilityRole="button"
             accessibilityLabel={p.name}
-            style={({ pressed }) => [styles.item, pressed && { transform: [{ scale: 0.92 }] }]}
+            accessibilityState={{ selected }}
+            style={({ pressed }) => [styles.item, { opacity: pressed ? 0.7 : 1 }]}
           >
-            <View
-              style={[
-                styles.swatch,
-                { backgroundColor: p.hex, shadowColor: p.hex },
-                selected && { borderColor: theme.text, shadowOpacity: 0.7 },
-              ]}
-            >
-              {selected && <Ionicons name="checkmark" size={22} color={isLight(p.hex) ? '#15161C' : '#fff'} />}
+            {/* O anel de seleção existe sempre (transparente quando não selecionado): nada se desloca */}
+            <View style={[styles.ring, { borderColor: selected ? color.foreground : 'transparent' }]}>
+              <View style={[styles.swatch, { backgroundColor: p.hex, shadowColor: p.hex }]}>
+                {selected && (
+                  <Ionicons
+                    name="checkmark"
+                    size={icon.md}
+                    color={isLight(p.hex) ? color.background : color.foreground}
+                    accessibilityElementsHidden
+                    importantForAccessibility="no"
+                  />
+                )}
+              </View>
             </View>
-            <Text style={[styles.label, selected && { color: theme.text }]}>{p.name}</Text>
+            <Text style={[type.caption, selected && { color: color.foreground }]}>{p.name}</Text>
           </Pressable>
         );
       })}
@@ -38,42 +45,44 @@ export function PresetGrid({ current, on, onPick }: Props) {
 }
 
 export function RecentRow({ colors, onPick }: { colors: string[]; onPick: (hex: string) => void }) {
-  if (!colors.length) return <Text style={styles.empty}>As cores que você usar aparecem aqui.</Text>;
+  if (!colors.length) {
+    return <Text style={type.label}>As cores que você usar aparecem aqui.</Text>;
+  }
   return (
-    <View style={styles.row}>
+    <View style={styles.recentRow}>
       {colors.map((hex) => (
         <Pressable
           key={hex}
           onPress={() => onPick(hex)}
+          accessibilityRole="button"
           accessibilityLabel={`Cor recente ${hex}`}
-          style={({ pressed }) => [
-            styles.recent,
-            { backgroundColor: hex, borderColor: withAlpha(hex, 0.35) },
-            pressed && { transform: [{ scale: 0.9 }] },
-          ]}
-        />
+          hitSlop={4}
+          style={({ pressed }) => [styles.recentHit, { opacity: pressed ? 0.7 : 1 }]}
+        >
+          <View style={[styles.recent, { backgroundColor: hex, borderColor: withAlpha('#FFFFFF', 0.18) }]} />
+        </Pressable>
       ))}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  grid: { flexDirection: 'row', flexWrap: 'wrap', rowGap: 14 },
-  item: { width: '25%', alignItems: 'center' },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', rowGap: space.lg },
+  item: { width: '25%', alignItems: 'center', gap: space.sm - 2 },
+  ring: { padding: 3, borderRadius: radius.lg, borderWidth: 2 },
   swatch: {
-    width: 54,
-    height: 54,
-    borderRadius: 18,
-    borderWidth: 2,
-    borderColor: 'transparent',
+    width: 50,
+    height: 50,
+    borderRadius: radius.md,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowOpacity: 0.35,
-    shadowRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.14)',
+    shadowOpacity: 0.45,
+    shadowRadius: 12,
     shadowOffset: { width: 0, height: 4 },
   },
-  label: { color: theme.muted, fontSize: 11.5, marginTop: 6 },
-  row: { flexDirection: 'row', gap: 12, flexWrap: 'wrap' },
-  recent: { width: 36, height: 36, borderRadius: 18, borderWidth: 3 },
-  empty: { color: theme.faint, fontSize: 13 },
+  recentRow: { flexDirection: 'row', flexWrap: 'wrap', gap: space.xs },
+  recentHit: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  recent: { width: 36, height: 36, borderRadius: 18, borderWidth: 2 },
 });

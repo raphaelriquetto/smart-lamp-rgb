@@ -94,11 +94,13 @@ Testado com Expo SDK 58, React Native 0.88, Reanimated 4.7 e reanimated-color-pi
 
 ### O que tem na tela
 
-- **Lâmpada central**: mostra a cor atual com brilho; tocar liga/desliga.
-- **Roda de cores** com controle de brilho; a cor é enviada quando você solta o dedo.
-- **Cores rápidas** (primárias, secundárias e branco) e **Recentes** (últimas 6 cores, salvas no celular).
-- **Comando de voz** com animação enquanto escuta.
-- **Status** no topo (Conectada / Sem conexão / Enviando) e vibração leve ao tocar.
+- **Lâmpada central**: halo na cor atual que "respira" quando ligada; tocar liga/desliga. O brilho de fundo da tela acompanha a cor.
+- **Indicadores**: estado, cor e conexão com o horário da última sincronização ("agora", "há 20s"…).
+- **Cor da luz**: abas **Roda** (roda de cores + brilho; a cor é enviada quando você solta o dedo) e **Paleta** (primárias, secundárias e branco), mais as **Recentes** (últimas 6, salvas no celular).
+- **Comando de voz** com animação enquanto escuta (só no app; na versão web não aparece).
+- Vibração leve ao tocar.
+
+**Design:** feito com a skill *UI/UX Pro Max* (estilo glassmorphism, paleta slate escura, fonte Plus Jakarta Sans). Os tokens (cores, espaçamentos, tipografia, tempos de animação) ficam em `app/src/theme.ts`. Alvos de toque têm no mínimo 44–48 pt, o contraste dos textos passa de 4,5:1 e as animações são desligadas quando o celular está com "reduzir movimento" ativo.
 
 ### Comando de voz
 

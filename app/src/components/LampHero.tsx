@@ -1,86 +1,115 @@
-// Lâmpada central: anéis de brilho na cor atual e botão de liga/desliga no meio.
+// Lâmpada central: halo na cor atual que "respira" quando ligada; tocar liga/desliga.
 import { useEffect } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
-import { colorName, isLight, theme, withAlpha } from '../theme';
+import Animated, {
+  cancelAnimation,
+  Easing,
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withRepeat,
+  withTiming,
+} from 'react-native-reanimated';
+import { color, colorName, icon, isLight, motion, space, type, withAlpha } from '../theme';
 
-const SIZE = 250;
+const SIZE = 264;
+const CORE = 120;
 const RINGS = [
-  { scale: 1, alpha: 0.07 },
-  { scale: 0.8, alpha: 0.13 },
-  { scale: 0.62, alpha: 0.22 },
+  { scale: 1, alpha: 0.06 },
+  { scale: 0.82, alpha: 0.11 },
+  { scale: 0.66, alpha: 0.2 },
 ];
 
 type Props = { color: string; on: boolean; onToggle: () => void };
 
-export function LampHero({ color, on, onToggle }: Props) {
+export function LampHero({ color: lampColor, on, onToggle }: Props) {
+  const reduceMotion = useReducedMotion();
   const glow = useSharedValue(on ? 1 : 0);
-  useEffect(() => {
-    glow.value = withTiming(on ? 1 : 0, { duration: 350 });
-  }, [on]);
-  const glowStyle = useAnimatedStyle(() => ({ opacity: 0.25 + glow.value * 0.75 }));
+  const breath = useSharedValue(0);
 
-  const core = on ? color : theme.off;
-  const iconColor = on && isLight(color) ? '#15161C' : '#FFFFFF';
+  useEffect(() => {
+    glow.value = withTiming(on ? 1 : 0, { duration: motion.state });
+    if (on && !reduceMotion) {
+      breath.value = withRepeat(withTiming(1, { duration: 2400, easing: Easing.inOut(Easing.sin) }), -1, true);
+    } else {
+      cancelAnimation(breath);
+      breath.value = withTiming(0, { duration: motion.state });
+    }
+  }, [on, reduceMotion]);
+
+  const halo = useAnimatedStyle(() => ({
+    opacity: 0.3 + glow.value * 0.7,
+    transform: [{ scale: 1 + breath.value * 0.04 }],
+  }));
+
+  const tint = on ? lampColor : color.off;
+  const iconColor = on && isLight(lampColor) ? color.background : color.foreground;
 
   return (
     <View style={styles.wrap}>
-      <Animated.View style={[StyleSheet.absoluteFill, styles.center, glowStyle]} pointerEvents="none">
-        {RINGS.map((r) => (
-          <View
-            key={r.scale}
-            style={[
-              styles.ring,
-              {
-                width: SIZE * r.scale,
-                height: SIZE * r.scale,
-                borderRadius: (SIZE * r.scale) / 2,
-                backgroundColor: withAlpha(on ? color : theme.off, r.alpha),
-              },
-            ]}
-          />
-        ))}
-      </Animated.View>
+      <View style={styles.stage}>
+        <Animated.View style={[StyleSheet.absoluteFill, styles.center, halo]} pointerEvents="none">
+          {RINGS.map((r) => (
+            <View
+              key={r.scale}
+              style={[
+                styles.ring,
+                {
+                  width: SIZE * r.scale,
+                  height: SIZE * r.scale,
+                  borderRadius: (SIZE * r.scale) / 2,
+                  backgroundColor: withAlpha(tint, on ? r.alpha : r.alpha * 0.5),
+                  borderColor: withAlpha(tint, on ? 0.18 : 0.08),
+                },
+              ]}
+            />
+          ))}
+        </Animated.View>
 
-      <Pressable
-        onPress={onToggle}
-        accessibilityRole="switch"
-        accessibilityState={{ checked: on }}
-        accessibilityLabel={on ? 'Desligar lâmpada' : 'Ligar lâmpada'}
-        style={({ pressed }) => [
-          styles.core,
-          { backgroundColor: core, shadowColor: on ? color : '#000', transform: [{ scale: pressed ? 0.94 : 1 }] },
-        ]}
-      >
-        <Ionicons name="power" size={42} color={iconColor} />
-      </Pressable>
-
-      <View style={styles.caption}>
-        <Text style={styles.name}>{on ? colorName(color) : 'Desligada'}</Text>
-        <Text style={styles.hex}>{on ? color.slice(0, 7).toUpperCase() : 'Toque para ligar'}</Text>
+        <Pressable
+          onPress={onToggle}
+          accessibilityRole="switch"
+          accessibilityState={{ checked: on }}
+          accessibilityLabel={on ? 'Desligar lâmpada' : 'Ligar lâmpada'}
+          style={({ pressed }) => [
+            styles.core,
+            {
+              backgroundColor: tint,
+              shadowColor: on ? lampColor : '#000',
+              borderColor: on ? withAlpha('#FFFFFF', 0.35) : color.glassBorder,
+              opacity: pressed ? 0.85 : 1,
+              transform: [{ scale: pressed ? 0.96 : 1 }],
+            },
+          ]}
+        >
+          <Ionicons name="power" size={icon.xl} color={iconColor} />
+        </Pressable>
       </View>
+
+      <Text style={[type.title, styles.name]}>{on ? colorName(lampColor) : 'Desligada'}</Text>
+      <Text style={[type.mono, styles.hint]}>{on ? lampColor.slice(0, 7).toUpperCase() : 'TOQUE PARA LIGAR'}</Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  wrap: { width: SIZE, height: SIZE + 56, alignItems: 'center', alignSelf: 'center' },
-  center: { height: SIZE, alignItems: 'center', justifyContent: 'center' },
-  ring: { position: 'absolute' },
+  wrap: { alignItems: 'center' },
+  stage: { width: SIZE, height: SIZE, alignItems: 'center', justifyContent: 'center' },
+  center: { alignItems: 'center', justifyContent: 'center' },
+  ring: { position: 'absolute', borderWidth: 1 },
   core: {
-    marginTop: (SIZE - 112) / 2,
-    width: 112,
-    height: 112,
-    borderRadius: 56,
+    width: CORE,
+    height: CORE,
+    borderRadius: CORE / 2,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowOpacity: 0.8,
-    shadowRadius: 30,
+    borderWidth: 1.5,
+    shadowOpacity: 0.85,
+    shadowRadius: 36,
     shadowOffset: { width: 0, height: 0 },
-    elevation: 16,
+    elevation: 18,
   },
-  caption: { position: 'absolute', top: SIZE - 4, alignItems: 'center' },
-  name: { color: theme.text, fontSize: 20, fontWeight: '700', letterSpacing: 0.2 },
-  hex: { color: theme.muted, fontSize: 13, marginTop: 2, letterSpacing: 1 },
+  name: { marginTop: space.sm },
+  hint: { marginTop: space.xs },
 });

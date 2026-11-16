@@ -13,8 +13,10 @@ import {
   View,
 } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Glass } from './Glass';
 import { getState, LampConfig } from '../orion';
-import { theme, withAlpha } from '../theme';
+import { color, font, icon, isLight, radius, space, touch, type, withAlpha } from '../theme';
 
 type Props = {
   visible: boolean;
@@ -27,9 +29,11 @@ type Props = {
 type Test = { kind: 'idle' | 'busy' | 'ok' | 'error'; text?: string };
 
 export function SettingsSheet({ visible, config, accent, onClose, onSave }: Props) {
+  const insets = useSafeAreaInsets();
   const [draft, setDraft] = useState(config);
   const [test, setTest] = useState<Test>({ kind: 'idle' });
   const [advanced, setAdvanced] = useState(false);
+  const [focused, setFocused] = useState<keyof LampConfig | null>(null);
 
   useEffect(() => {
     if (visible) {
@@ -42,7 +46,7 @@ export function SettingsSheet({ visible, config, accent, onClose, onSave }: Prop
     setTest({ kind: 'busy' });
     try {
       const s = await getState(draft);
-      setTest({ kind: 'ok', text: `Lâmpada encontrada (${s.state ?? 'sem estado'}${s.color ? `, ${s.color}` : ''})` });
+      setTest({ kind: 'ok', text: `Lâmpada encontrada (${s.state ?? 'sem estado'}${s.color ? `, #${s.color}` : ''})` });
     } catch (e: any) {
       setTest({ kind: 'error', text: e.message ?? String(e) });
     }
@@ -50,35 +54,55 @@ export function SettingsSheet({ visible, config, accent, onClose, onSave }: Prop
 
   const field = (key: keyof LampConfig, label: string, placeholder?: string, numeric = false) => (
     <View style={styles.field}>
-      <Text style={styles.label}>{label}</Text>
+      <Text style={type.label} nativeID={`label-${key}`}>
+        {label}
+      </Text>
       <TextInput
-        style={styles.input}
+        style={[styles.input, focused === key && { borderColor: accent, backgroundColor: withAlpha(accent, 0.06) }]}
         value={draft[key]}
         onChangeText={(v) => setDraft({ ...draft, [key]: v })}
+        onFocus={() => setFocused(key)}
+        onBlur={() => setFocused(null)}
         autoCapitalize="none"
         autoCorrect={false}
         keyboardType={numeric ? 'numeric' : 'default'}
         placeholder={placeholder}
-        placeholderTextColor={theme.faint}
+        placeholderTextColor={color.subtle}
+        accessibilityLabelledBy={`label-${key}`}
+        accessibilityLabel={label}
       />
     </View>
   );
 
+  const onAccent = isLight(accent) ? color.background : color.foreground;
+
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose} statusBarTranslucent>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.backdrop}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="Fechar" />
-        <View style={styles.sheet}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="Fechar configurações" />
+        <Glass strong intensity={50} style={[styles.sheet, { paddingBottom: space.xl + insets.bottom }]}>
           <View style={styles.grabber} />
-          <ScrollView keyboardShouldPersistTaps="handled">
-            <Text style={styles.title}>Servidor FIWARE</Text>
-            <Text style={styles.subtitle}>O app envia os comandos para o Orion na sua VM da AWS.</Text>
+          <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+            <View style={styles.titleRow}>
+              <View style={[styles.badge, { backgroundColor: withAlpha(accent, 0.16) }]}>
+                <Ionicons name="server-outline" size={icon.md} color={accent} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={type.title}>Servidor FIWARE</Text>
+                <Text style={type.label}>O app envia os comandos para o Orion na VM da AWS.</Text>
+              </View>
+            </View>
 
             {field('host', 'IP público da VM', 'ex.: 54.207.10.20')}
 
-            <Pressable onPress={() => setAdvanced(!advanced)} style={styles.advancedToggle}>
-              <Text style={styles.advancedText}>Avançado</Text>
-              <Ionicons name={advanced ? 'chevron-up' : 'chevron-down'} size={16} color={theme.muted} />
+            <Pressable
+              onPress={() => setAdvanced(!advanced)}
+              style={styles.advancedToggle}
+              accessibilityRole="button"
+              accessibilityState={{ expanded: advanced }}
+            >
+              <Text style={styles.advancedText}>Configurações avançadas</Text>
+              <Ionicons name={advanced ? 'chevron-up' : 'chevron-down'} size={icon.sm} color={color.mutedForeground} />
             </Pressable>
             {advanced && (
               <>
@@ -91,93 +115,126 @@ export function SettingsSheet({ visible, config, accent, onClose, onSave }: Prop
 
             {test.kind !== 'idle' && (
               <View
+                accessibilityLiveRegion="polite"
                 style={[
                   styles.testBox,
-                  test.kind === 'ok' && { borderColor: withAlpha(theme.success, 0.4) },
-                  test.kind === 'error' && { borderColor: withAlpha(theme.danger, 0.4) },
+                  test.kind === 'ok' && {
+                    borderColor: withAlpha(color.success, 0.4),
+                    backgroundColor: withAlpha(color.success, 0.08),
+                  },
+                  test.kind === 'error' && {
+                    borderColor: withAlpha(color.danger, 0.4),
+                    backgroundColor: withAlpha(color.danger, 0.08),
+                  },
                 ]}
               >
                 {test.kind === 'busy' ? (
-                  <ActivityIndicator color={theme.muted} />
+                  <ActivityIndicator color={color.mutedForeground} />
                 ) : (
                   <Ionicons
                     name={test.kind === 'ok' ? 'checkmark-circle' : 'alert-circle'}
-                    size={18}
-                    color={test.kind === 'ok' ? theme.success : theme.danger}
+                    size={icon.md}
+                    color={test.kind === 'ok' ? color.success : color.danger}
                   />
                 )}
-                <Text style={styles.testText}>{test.kind === 'busy' ? 'Testando…' : test.text}</Text>
+                <Text style={[type.body, { flex: 1, fontSize: 14 }]}>
+                  {test.kind === 'busy' ? 'Testando conexão…' : test.text}
+                </Text>
               </View>
             )}
 
             <View style={styles.buttons}>
-              <Pressable style={[styles.button, styles.secondary]} onPress={runTest} disabled={!draft.host}>
-                <Ionicons name="pulse" size={18} color={theme.text} />
+              <Pressable
+                style={({ pressed }) => [styles.button, styles.secondary, { opacity: !draft.host ? 0.4 : pressed ? 0.7 : 1 }]}
+                onPress={runTest}
+                disabled={!draft.host}
+                accessibilityRole="button"
+                accessibilityState={{ disabled: !draft.host }}
+              >
+                <Ionicons name="pulse" size={icon.sm} color={color.foreground} />
                 <Text style={styles.buttonText}>Testar conexão</Text>
               </Pressable>
-              <Pressable style={[styles.button, { backgroundColor: accent }]} onPress={() => onSave(draft)}>
-                <Ionicons name="checkmark" size={18} color="#fff" />
-                <Text style={styles.buttonText}>Salvar</Text>
+              <Pressable
+                style={({ pressed }) => [styles.button, { backgroundColor: accent, opacity: pressed ? 0.85 : 1 }]}
+                onPress={() => onSave(draft)}
+                accessibilityRole="button"
+              >
+                <Ionicons name="checkmark" size={icon.sm} color={onAccent} />
+                <Text style={[styles.buttonText, { color: onAccent }]}>Salvar</Text>
               </Pressable>
             </View>
           </ScrollView>
-        </View>
+        </Glass>
       </KeyboardAvoidingView>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: '#000000AA', justifyContent: 'flex-end' },
+  backdrop: { flex: 1, backgroundColor: color.scrim, justifyContent: 'flex-end' },
   sheet: {
-    backgroundColor: theme.card,
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    padding: 22,
-    paddingBottom: 34,
-    maxHeight: '88%',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: theme.border,
+    borderTopLeftRadius: radius.xl,
+    borderTopRightRadius: radius.xl,
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
+    paddingHorizontal: space.xl,
+    paddingTop: space.md,
+    maxHeight: '90%',
+    width: '100%',
+    maxWidth: 560,
+    alignSelf: 'center',
   },
-  grabber: { width: 40, height: 4, borderRadius: 2, backgroundColor: theme.border, alignSelf: 'center', marginBottom: 16 },
-  title: { color: theme.text, fontSize: 20, fontWeight: '700' },
-  subtitle: { color: theme.muted, fontSize: 13, marginTop: 4, marginBottom: 18 },
-  field: { marginBottom: 14 },
-  label: { color: theme.muted, fontSize: 12, marginBottom: 6 },
+  grabber: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignSelf: 'center',
+    marginBottom: space.xl,
+  },
+  titleRow: { flexDirection: 'row', alignItems: 'center', gap: space.md, marginBottom: space.xl },
+  badge: { width: touch, height: touch, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' },
+  field: { marginBottom: space.lg, gap: space.sm - 2 },
   input: {
-    backgroundColor: theme.cardHigh,
-    color: theme.text,
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 15,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: theme.border,
+    minHeight: touch,
+    backgroundColor: 'rgba(15, 23, 42, 0.7)',
+    color: color.foreground,
+    fontFamily: font.medium,
+    borderRadius: radius.md,
+    paddingHorizontal: space.lg,
+    fontSize: 16,
+    borderWidth: 1,
+    borderColor: color.glassBorder,
   },
-  advancedToggle: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 14 },
-  advancedText: { color: theme.muted, fontSize: 13, fontWeight: '600' },
+  advancedToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.xs,
+    minHeight: 40,
+    alignSelf: 'flex-start',
+    marginBottom: space.sm,
+  },
+  advancedText: { fontFamily: font.semibold, fontSize: 13, color: color.mutedForeground },
   testBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    padding: 12,
-    borderRadius: 14,
-    backgroundColor: theme.cardHigh,
+    gap: space.md,
+    padding: space.md,
+    borderRadius: radius.md,
     borderWidth: 1,
-    borderColor: theme.border,
-    marginBottom: 6,
+    borderColor: color.glassBorder,
+    marginBottom: space.sm,
   },
-  testText: { color: theme.text, fontSize: 13, flex: 1 },
-  buttons: { flexDirection: 'row', gap: 12, marginTop: 12 },
+  buttons: { flexDirection: 'row', gap: space.md, marginTop: space.md },
   button: {
     flex: 1,
+    minHeight: touch,
     flexDirection: 'row',
-    gap: 8,
+    gap: space.sm,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 14,
-    borderRadius: 16,
+    borderRadius: radius.md,
   },
-  secondary: { backgroundColor: theme.cardHigh, borderWidth: StyleSheet.hairlineWidth, borderColor: theme.border },
-  buttonText: { color: '#fff', fontSize: 15, fontWeight: '600' },
+  secondary: { backgroundColor: 'rgba(248,250,252,0.06)', borderWidth: 1, borderColor: color.glassBorder },
+  buttonText: { fontFamily: font.bold, fontSize: 15, color: color.foreground },
 });
