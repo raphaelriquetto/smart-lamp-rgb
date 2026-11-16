@@ -1,13 +1,106 @@
 # Smart Lamp RGB: app + firmware
 
-Extensão do [FIWARE Made Simple](https://github.com/fabiocabrini/fiware-made-simple) para controlar a cor de um LED RGB pelo celular, com roda de cores, botões de cor fixa e comando de voz.
+Extensão do [FIWARE Made Simple](https://github.com/fabiocabrini/fiware-made-simple) para controlar a cor de um LED RGB pelo celular, com roda de cores, botões de cor fixa, comando de voz e acompanhamento da luminosidade do ambiente (sensor LDR).
 
-```
-App (celular) --HTTP PATCH--> Orion :1026 --> IoT Agent --MQTT--> Mosquitto :1883 <--MQTT-- ESP32
-                                (VM na AWS: tudo em Docker)                        (conexão de saída)
+## Arquitetura
+
+O projeto tem três partes: **quem usa** (app, navegador, Postman), a **VM na AWS** com o FIWARE em Docker e o **ESP32** com o LED e o sensor. O celular nunca fala direto com o ESP32: os dois só se encontram no servidor. É o ESP32 quem abre a conexão com o Mosquitto, por isso ele funciona atrás do Wi-Fi de casa ou da faculdade.
+
+```mermaid
+flowchart LR
+  subgraph CLI["Quem usa"]
+    APP["📱 App Expo<br/><code>app/</code>"]
+    NAV["🌐 Navegador<br/>site da VM"]
+    PM["🧪 Postman<br/><code>postman/</code>"]
+  end
+
+  subgraph VM["☁️ VM na AWS (EC2) · Docker"]
+    WEB["nginx · site do app<br/><code>web/</code> · :8080"]
+    ORION["Orion Context Broker<br/>estado atual · :1026"]
+    STH["STH-Comet<br/>histórico · :8666"]
+    IOTA["IoT Agent UltraLight<br/>tradutor · :4041"]
+    MQ["Mosquitto<br/>MQTT · :1883"]
+  end
+
+  subgraph DEV["🔌 ESP32 · <code>firmware/smart_lamp_rgb/</code>"]
+    LDR["Sensor LDR<br/>GPIO 34"]
+    ESP["ESP32"]
+    LED["LED RGB<br/>GPIO 25 · 26 · 27"]
+  end
+
+  NAV -- "abre a página" --> WEB
+  APP -- "PATCH comandos · GET estado" --> ORION
+  NAV -- "PATCH · GET" --> ORION
+  ORION -. "assinatura" .-> STH
+  PM -- "provisiona" --> IOTA
+  ORION <-- "comandos ⇄ atributos" --> IOTA
+  IOTA <-- "MQTT" --> MQ
+  MQ <-- "on · off · color ⇄<br/>estado · cor · luminosidade" --> ESP
+  LDR -- "tensão" --> ESP
+  ESP -- "PWM" --> LED
+
+  classDef cli fill:#FDE7DD,stroke:#D85A30,color:#4A1B0C
+  classDef vm fill:#EEEDFE,stroke:#534AB7,color:#26215C
+  classDef dev fill:#E1F5EE,stroke:#0F6E56,color:#04342C
+  class APP,NAV,PM cli
+  class WEB,ORION,IOTA,MQ,STH vm
+  class ESP,LED,LDR dev
 ```
 
-O app não fala com o ESP32 direto. Ele faz o mesmo `PATCH` da pasta 4 da collection. Quem abre a conexão com o broker é o ESP32, por isso ele funciona atrás do Wi-Fi de casa ou da faculdade.
+> **Sem VM e sem ESP32?** O `simulador/` faz o papel da caixa roxa (Orion + site) e da verde (ESP32 + LED + LDR) no seu PC. Veja a seção 6.
+
+### Fluxo do comando: da tela até o LED
+
+O app só fala com o Orion, com o mesmo `PATCH` da pasta 4 da collection. O IoT Agent transforma o comando em uma mensagem MQTT, e o ESP32 confirma em `/cmdexe`. Sem essa confirmação, o `color_status` fica `PENDING` para sempre.
+
+```mermaid
+sequenceDiagram
+  autonumber
+  actor U as Você
+  participant A as App
+  participant O as Orion
+  participant I as IoT Agent
+  participant M as Mosquitto
+  participant E as ESP32 + LED
+  U->>A: toca em Azul
+  A->>O: PATCH color = 0000FF
+  O->>I: repassa o comando
+  I->>M: lamp001@color|0000FF em /TEF/lamp001/cmd
+  M->>E: entrega o comando
+  E->>E: LED fica azul
+  E->>M: confirma em /TEF/lamp001/cmdexe
+  M->>I: confirmação
+  I->>O: color_status = OK
+  E->>M: s|on|c|0000FF em /TEF/lamp001/attrs
+  M->>I: novo estado
+  I->>O: state = on e color = 0000FF
+```
+
+### Fluxo da luminosidade: do LDR até o gráfico
+
+Aqui o caminho é o inverso: o ESP32 **envia** a leitura sozinho, e o app **vai buscar** no Orion. O Orion guarda só o valor atual; o histórico de 5 minutos do gráfico é montado pelo próprio app. O histórico longo fica no STH-Comet, se a assinatura 2.6 da collection do professor estiver criada.
+
+```mermaid
+sequenceDiagram
+  autonumber
+  participant L as Sensor LDR
+  participant E as ESP32
+  participant M as Mosquitto
+  participant I as IoT Agent
+  participant O as Orion
+  participant A as App
+  L->>E: luz vira tensão no AO
+  E->>E: média de 16 leituras, escala 0 a 100
+  E->>M: 57 em /TEF/lamp001/attrs/l
+  Note over E,M: a cada 5 s, ou na hora se mudar 5 pontos
+  M->>I: entrega a leitura
+  I->>O: traduz l para luminosity = 57
+  loop a cada 5 s, com o app aberto
+    A->>O: GET luminosity
+    O-->>A: luminosity 57
+  end
+  A->>A: guarda e desenha o gráfico de 5 min
+```
 
 ## Pastas
 
